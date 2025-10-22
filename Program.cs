@@ -1,8 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using EngineeringThesis.Data;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.CookiePolicy;
-using Microsoft.OpenApi.Models;
 using EngineeringThesis.Services.Security;
 
 var builder = WebApplication.CreateBuilder(args);
