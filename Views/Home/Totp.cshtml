@@ -1,0 +1,178 @@
+﻿@using System.Runtime.InteropServices
+@{
+    ViewData["Title"] = "TOTP (DEV)";
+    var email = (string?)ViewBag.Email ?? "";
+
+    var tzId = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+        ? "Central European Standard Time"
+        : "Europe/Warsaw";
+}
+<style>
+    .topbar {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 16px;
+    }
+
+        .topbar input[type=email] {
+            flex: 1;
+            padding: 10px 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+        }
+
+        .topbar button {
+            padding: 10px 14px;
+            border: 0;
+            border-radius: 8px;
+            background: #1f2937;
+            color: #fff;
+        }
+
+    .pill {
+        font-size: 12px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid #e5e7eb;
+        margin-left: 8px;
+    }
+
+    .phone {
+        width: 340px;
+        margin: 24px auto;
+        border: 1px solid #e5e7eb;
+        border-radius: 24px;
+        padding: 18px;
+        box-shadow: 0 10px 30px rgba(0,0,0,.06);
+    }
+
+    .acct {
+        font-weight: 600;
+        color: #111827;
+        text-align: center;
+    }
+
+    .code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 34px;
+        letter-spacing: 2px;
+        text-align: center;
+        margin: 16px 0 6px;
+    }
+
+    .muted {
+        color: #6b7280;
+        text-align: center;
+    }
+
+    .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        justify-content: center;
+        margin-top: 10px;
+    }
+
+    .copy {
+        padding: 8px 12px;
+        border-radius: 10px;
+        border: 1px solid #e5e7eb;
+        background: white;
+        cursor: pointer;
+    }
+
+    .bar {
+        height: 6px;
+        width: 100%;
+        background: #eef2f7;
+        border-radius: 999px;
+        overflow: hidden;
+        margin-top: 12px;
+    }
+
+        .bar > div {
+            height: 100%;
+            width: 0%;
+            background: #111827;
+        }
+</style>
+
+<h2 class="muted" style="text-align:left;">DEV TOTP</h2>
+<form method="get" class="topbar">
+    <input type="email" name="email" value="@email" placeholder="Wpisz e-mail użytkownika..." required />
+    <button type="submit">Pokaż generator</button>
+    @if (!ViewData.ModelState.IsValid)
+    {
+        <span class="pill">@(ViewData.ModelState["Email"]?.Errors.FirstOrDefault()?.ErrorMessage)</span>
+    }
+</form>
+
+@if (string.IsNullOrWhiteSpace(email))
+{
+    <p class="muted" style="text-align:left;">Podaj e-mail, aby wyświetlić generator TOTP.</p>
+}
+else if (!ViewData.ModelState.IsValid)
+{
+    <p class="muted" style="text-align:left;">Użytkownik nie istnieje.</p>
+}
+else
+{
+    <div class="phone">
+        <div class="acct">@email</div>
+        <div id="code" class="code">------</div>
+        <div class="muted" id="ttl">Odświeżanie…</div>
+        <div class="bar"><div id="progress"></div></div>
+
+        <div class="row">
+            <button class="copy" type="button" onclick="copyCode()">Kopiuj</button>
+            <span class="muted" id="expires">Wygasa: --:--:-- (@tzId)</span>
+        </div>
+    </div>
+
+    <script>
+        const email = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(email));
+        let secondsLeft = 0, lastFetch = 0;
+
+        async function fetchCode() {
+            const r = await fetch(`/Home/TotpData?email=${encodeURIComponent(email)}&t=${Date.now()}`, { cache: 'no-store' });
+            if (!r.ok) { document.getElementById('ttl').innerText = 'Błąd pobierania kodu'; return; }
+            const data = await r.json();
+            const code = (data.code || '').toString();
+
+            const pretty = code.length === 6 ? code.slice(0,3) + ' ' + code.slice(3) : code;
+            document.getElementById('code').innerText = pretty;
+            secondsLeft = data.validForSeconds ?? 0;
+            document.getElementById('ttl').innerText = `Ważny jeszcze: ${secondsLeft}s`;
+            document.getElementById('expires').innerText = `Wygasa: ${data.expiresAtLocal} (@tzId)`;
+            lastFetch = Date.now();
+            updateProgress();
+        }
+
+        function updateProgress() {
+            const step = 60;
+            const bar = document.getElementById('progress');
+            if (secondsLeft < 0) secondsLeft = 0;
+            const pct = ((step - secondsLeft) / step) * 100;
+            bar.style.width = pct + '%';
+            document.getElementById('ttl').innerText = `Ważny jeszcze: ${secondsLeft}s`;
+        }
+
+        function tick() {
+            secondsLeft -= 1;
+            if (secondsLeft <= 0) {
+                fetchCode(); 
+            } else {
+                updateProgress();
+            }
+        }
+
+        function copyCode() {
+            const text = document.getElementById('code').innerText.replace(' ', '');
+            navigator.clipboard.writeText(text);
+        }
+
+        fetchCode();
+        setInterval(tick, 1000);
+    </script>
+}

@@ -1,0 +1,185 @@
+﻿@{
+    ViewData["Title"] = "Mój profil";
+}
+
+<section style="max-width:720px;margin:32px auto;">
+    <h2>Mój profil</h2>
+
+    <div id="profileBox" style="padding:12px;border:1px solid #eee;border-radius:8px;margin-top:8px;">
+        <p><strong>Email:</strong> <span id="profEmail">...</span></p>
+        <p><strong>Nazwa użytkownika:</strong> <span id="profUser">...</span></p>
+
+        <hr />
+
+        <h3>Uwierzytelnianie 2FA (TOTP)</h3>
+        <label style="display:flex;align-items:center;gap:8px;margin:8px 0 16px;">
+            <input id="totpToggle" type="checkbox" />
+            <span>Wymagaj kodu TOTP przy logowaniu</span>
+        </label>
+        <button id="saveTotp" type="button">Zapisz ustawienie 2FA</button>
+        <p id="totpMsg" style="margin-top:8px;"></p>
+
+        <hr style="margin:24px 0;" />
+
+        <h3>Zmień hasło</h3>
+        <p style="color:#666;">Zmiana wykorzysta istniejący mechanizm z kodem wysłanym na mail i pytaniem kontrolnym.</p>
+
+        <div id="pwStep1">
+            <button id="startPwChange" type="button">Rozpocznij zmianę hasła</button>
+            <p id="pwMsg1" style="margin-top:8px;"></p>
+        </div>
+
+        <form id="pwForm" style="display:none;margin-top:12px;">
+            <p><strong>Pytanie kontrolne:</strong> <span id="secQ">...</span></p>
+
+            <label for="pwCode">Kod z maila (8 cyfr)</label>
+            <input id="pwCode" required inputmode="numeric" pattern="[0-9]{8}" maxlength="8" autocomplete="one-time-code"
+                   style="width:100%;padding:8px;margin:4px 0 12px;" />
+
+            <label for="secAns">Odpowiedź na pytanie kontrolne</label>
+            <input id="secAns" required
+                   style="width:100%;padding:8px;margin:4px 0 12px;" />
+
+            <label for="pwNew">Nowe hasło</label>
+            <input id="pwNew" type="password" required
+                   style="width:100%;padding:8px;margin:4px 0 12px;" />
+
+            <label for="pwNew2">Potwierdź nowe hasło</label>
+            <input id="pwNew2" type="password" required
+                   style="width:100%;padding:8px;margin:4px 0 12px;" />
+
+            <button type="submit">Zmień hasło</button>
+            <p id="pwMsg2" style="margin-top:8px;"></p>
+        </form>
+    </div>
+</section>
+
+<script>
+    (function () {
+      const secQMap = {
+        0: 'Imię pierwszego zwierzęcia',
+        1: 'Nazwisko panieńskie matki',
+        2: 'Miasto urodzenia',
+        3: 'Ulubiony nauczyciel',
+        4: 'Ulubiony kolor'
+      };
+
+      const profEmail = document.getElementById('profEmail');
+      const profUser  = document.getElementById('profUser');
+      const totpToggle = document.getElementById('totpToggle');
+      const totpMsg = document.getElementById('totpMsg');
+
+      const startBtn = document.getElementById('startPwChange');
+      const pwMsg1 = document.getElementById('pwMsg1');
+      const pwForm = document.getElementById('pwForm');
+      const secQEl = document.getElementById('secQ');
+      const pwCode = document.getElementById('pwCode');
+      const secAns = document.getElementById('secAns');
+      const pwNew  = document.getElementById('pwNew');
+      const pwNew2 = document.getElementById('pwNew2');
+      const pwMsg2 = document.getElementById('pwMsg2');
+
+      let emailForReset = '';
+
+      (async function loadMe(){
+        try {
+          const r = await fetch('/api/auth/me', { credentials: 'include' });
+          if (!r.ok) throw new Error('Brak autoryzacji');
+          const data = await r.json();
+          profEmail.textContent = data.email || '';
+          profUser.textContent  = data.username || '';
+          emailForReset = data.email || '';
+
+          const r2 = await fetch('/api/auth/twofactor', { credentials: 'include' });
+          if (r2.ok) {
+            const s = await r2.json();
+            totpToggle.checked = !!s.twoFactorEnabled;
+          }
+          
+        } catch {
+          profEmail.textContent = '—';
+          profUser.textContent = '—';
+        }
+      })();
+
+      document.getElementById('saveTotp').addEventListener('click', async () => {
+        totpMsg.textContent = 'Zapisywanie...';
+        try {
+            const r = await fetch('/api/auth/twofactor', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ enabled: !!totpToggle.checked })
+          });
+          if (r.ok) {
+            totpMsg.style.color = '#060';
+            totpMsg.textContent = 'Zapisano preferencję 2FA.';
+          } else {
+            const t = await r.text();
+            throw new Error(t || 'Błąd zapisu 2FA');
+          }
+        } catch (e) {
+          totpMsg.style.color = '#c00';
+          totpMsg.textContent = 'Nie udało się zapisać. (Wymagany endpoint w API.)';
+        }
+      });
+
+      startBtn.addEventListener('click', async () => {
+        pwMsg1.textContent = 'Wysyłam kod na mail...';
+        pwMsg1.style.color = '#444';
+        try {
+          const r = await fetch('/api/auth/password-reset/request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ Email: emailForReset })
+          });
+          const data = await r.json();
+          if (!r.ok) throw new Error(data?.message || 'Błąd żądania.');
+          const qId = data?.securityQuestion;
+          secQEl.textContent = secQMap[qId] ?? 'Pytanie kontrolne';
+
+          pwMsg1.textContent = 'Kod wysłany. Wypełnij formularz poniżej.';
+          pwForm.style.display = '';
+        } catch (e) {
+          pwMsg1.style.color = '#c00';
+          pwMsg1.textContent = (e && e.message) || 'Nie udało się rozpocząć resetu hasła.';
+        }
+      });
+
+      pwForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        pwMsg2.textContent = '';
+
+        if (pwNew.value !== pwNew2.value) {
+          pwMsg2.style.color = '#c00';
+          pwMsg2.textContent = 'Hasła nie są identyczne.';
+          return;
+        }
+
+        const payload = {
+          Email: emailForReset,
+          Code: pwCode.value.trim(),
+          SecurityAnswer: secAns.value,
+          NewPassword: pwNew.value
+        };
+
+        try {
+          const r = await fetch('/api/auth/password-reset/confirm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(payload)
+          });
+          const data = await r.json();
+          if (!r.ok) throw new Error(data?.message || 'Nie udało się zmienić hasła.');
+          pwMsg2.style.color = '#060';
+          pwMsg2.textContent = 'Hasło zmienione. Zaloguj się ponownie tym hasłem przy kolejnym logowaniu.';
+          pwForm.reset();
+        } catch (e) {
+          pwMsg2.style.color = '#c00';
+          pwMsg2.textContent = (e && e.message) || 'Błąd przy zmianie hasła.';
+        }
+      });
+    })();
+</script>

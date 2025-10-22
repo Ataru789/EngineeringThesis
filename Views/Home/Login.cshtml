@@ -1,0 +1,87 @@
+﻿@{
+    ViewData["Title"] = "Logowanie";
+}
+
+<section style="max-width:420px;margin:32px auto;">
+  <h2>Logowanie</h2>
+  <form id="loginForm">
+    <label for="emailInput">Email lub nazwa użytkownika</label>
+    <input id="emailInput" name="email" type="text" required
+           style="width:100%;padding:8px;margin:4px 0 12px;" />
+
+    <label for="passwordInput">Hasło</label>
+    <input id="passwordInput" name="password" type="password" required
+           style="width:100%;padding:8px;margin:4px 0 12px;" />
+
+    <label style="display:flex;align-items:center;gap:8px;margin:8px 0 16px;">
+      <input id="rememberMe" type="checkbox" />
+      <span>Pamiętaj mnie</span>
+    </label>
+
+    <div id="twoFactorBlock" style="display:none;margin:12px 0;">
+      <label for="totpInput">Kod TOTP (6 cyfr)</label>
+            <input id="totpInput" name="TwoFactorCode" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"
+             style="width:100%;padding:8px;margin:4px 0 8px;" />
+    </div>
+
+    <button id="loginBtn" type="submit" style="margin-top:8px;">Zaloguj</button>
+  </form>
+
+  <p id="loginMsg" style="color:#c00;margin-top:12px;"></p>
+</section>
+
+<script>
+(function () {
+  const form = document.getElementById('loginForm');
+  const msg  = document.getElementById('loginMsg');
+  const twoFactorBlock = document.getElementById('twoFactorBlock');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    msg.textContent = '';
+
+    const email = document.getElementById('emailInput').value.trim();
+    const password = document.getElementById('passwordInput').value;
+    const rememberMe = document.getElementById('rememberMe').checked;
+    const twoFactorCodeEl = document.getElementById('totpInput');
+    const twoFactorCode = twoFactorBlock.style.display !== 'none' ? (twoFactorCodeEl.value || null) : null;
+
+    const payload = {
+      Identifier: email,
+      Password: password,       
+      RememberMe: rememberMe,   
+      TwoFactorCode: twoFactorCode
+    };
+
+    try {
+      const r = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload)
+      });
+
+      if (r.ok) {
+        location.href = '/';
+        return;
+      }
+
+      const data = await r.json().catch(() => ({}));
+      const m = (data && (data.message || data.error || JSON.stringify(data))) || 'Błąd logowania.';
+
+      if (r.status === 401 && String(m).toLowerCase().includes('wymagany kod 2fa')) {
+        twoFactorBlock.style.display = '';
+        msg.style.color = '#444';
+        msg.textContent = 'Włączone 2FA — podaj 6-cyfrowy kod z aplikacji i spróbuj ponownie.';
+        return;
+      }
+
+      msg.style.color = '#c00';
+      msg.textContent = m;
+    } catch (err) {
+      msg.style.color = '#c00';
+      msg.textContent = 'Błąd sieci. Spróbuj ponownie.';
+    }
+  });
+})();
+</script>

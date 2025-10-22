@@ -1,0 +1,315 @@
+﻿@model EngineeringThesis.Contracts.Auth.RegisterRequest
+@{
+    ViewData["Title"] = "Rejestracja";
+    var securityQuestions = new[]
+    {
+        "Imię Twojego pierwszego zwierzaka?",
+        "Nazwisko panieńskie matki?",
+        "Miasto, w którym się urodziłeś/aś?",
+        "Nazwisko Twojego ulubionego nauczyciela?",
+        "Ulubiony kolor?",
+    };
+}
+
+<h2 class="mb-4">Rejestracja</h2>
+
+<div id="alertBox" class="alert d-none" role="alert"></div>
+
+<form id="registerForm" novalidate>
+    <div asp-validation-summary="ModelOnly" class="text-danger mb-2"></div>
+
+    <div class="mb-3">
+        <label asp-for="Username" class="form-label">Nazwa użytkownika</label>
+        <input asp-for="Username" class="form-control" autocomplete="username" />
+        <span asp-validation-for="Username" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Email" class="form-label">E-mail</label>
+        <input asp-for="Email" class="form-control" autocomplete="email" />
+        <span asp-validation-for="Email" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Password" class="form-label">Hasło</label>
+        <input asp-for="Password" class="form-control" autocomplete="new-password" />
+        <span asp-validation-for="Password" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="ConfirmPassword" class="form-label">Potwierdź hasło</label>
+        <input asp-for="ConfirmPassword" class="form-control" autocomplete="new-password" />
+        <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="SecurityQuestion" class="form-label">Pytanie do resetu hasła</label>
+        <select asp-for="SecurityQuestion" class="form-select" id="SecurityQuestion">
+            @for (var i = 0; i < securityQuestions.Length; i++)
+            {
+                <option value="@i">@securityQuestions[i]</option>
+            }
+        </select>
+        <span asp-validation-for="SecurityQuestion" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="SecurityAnswer" class="form-label">Odpowiedź na pytanie</label>
+        <input asp-for="SecurityAnswer" class="form-control" />
+        <span asp-validation-for="SecurityAnswer" class="text-danger"></span>
+    </div>
+
+    <button type="submit" id="registerBtn" class="btn btn-primary">
+        <span class="spinner-border spinner-border-sm me-2 d-none" id="regSpinner" aria-hidden="true"></span>
+        Zarejestruj
+    </button>
+</form>
+
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h5 class="modal-title" id="confirmModalLabel">Potwierdzenie e-maila</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-2">
+                    Wpisz <strong>8-cyfrowy</strong> kod potwierdzający.
+                </p>
+                <div class="mb-2">
+                    <label for="confirmCode" class="form-label">Kod</label>
+                    <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="8" class="form-control" id="confirmCode" />
+                    <div id="confirmError" class="text-danger small mt-1 d-none"></div>
+                    <div id="confirmOk" class="text-success small mt-1 d-none"></div>
+                </div>
+            </div>
+            <div class="modal-footer flex-wrap gap-2 py-2">
+                <button type="button" id="resendBtn" class="btn btn-outline-secondary">
+                    <span class="spinner-border spinner-border-sm me-2 d-none" id="resendSpinner"></span>
+                    <span id="resendLabel">Wyślij ponownie kod</span>
+                </button>
+                <div class="ms-auto"></div>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
+                <button type="button" id="confirmBtn" class="btn btn-success">
+                    <span class="spinner-border spinner-border-sm me-2 d-none" id="confirmSpinner"></span>
+                    Potwierdź
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            const form = document.getElementById('registerForm');
+            const btn = document.getElementById('registerBtn');
+            const spinner = document.getElementById('regSpinner');
+            const alertBox = document.getElementById('alertBox');
+            const codeModalEl = document.getElementById('confirmModal');
+            let codeModal;
+            let registeredEmail = '';
+
+            function showAlert(msg, type) {
+                alertBox.className = 'alert alert-' + type;
+                alertBox.textContent = msg;
+                alertBox.classList.remove('d-none');
+            }
+            function clearAlert() {
+                alertBox.className = 'alert d-none';
+                alertBox.textContent = '';
+            }
+            function setBusy(busy) {
+                btn.disabled = busy;
+                spinner.classList.toggle('d-none', !busy);
+            }
+            function clearServerErrors() {
+                const spans = form.querySelectorAll('span.field-validation-error, span.text-danger');
+                spans.forEach(s => { if (!s.classList.contains('text-danger')) return; s.textContent = ''; });
+                const summary = form.querySelector('[data-valmsg-summary="true"]');
+                if (summary) summary.innerHTML = '';
+            }
+            function applyModelStateErrors(errors) {
+                for (const [field, msgs] of Object.entries(errors)) {
+                    const span = form.querySelector(`[data-valmsg-for="${field}"]`);
+                    if (span) {
+                        span.textContent = msgs.join(' ');
+                        span.classList.add('field-validation-error');
+                    }
+                }
+            }
+
+            form.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                clearAlert();
+                clearServerErrors();
+
+                if (typeof $ !== 'undefined' && $(form).valid && !$(form).valid()) {
+                    return;
+                }
+
+                const payload = {
+                    Email: form.querySelector('#Email').value,
+                    Username: form.querySelector('#Username').value,
+                    Password: form.querySelector('#Password').value,
+                    ConfirmPassword: form.querySelector('#ConfirmPassword').value,
+                    SecurityQuestion: parseInt(form.querySelector('#SecurityQuestion').value, 10),
+                    SecurityAnswer: form.querySelector('#SecurityAnswer').value
+                };
+
+                setBusy(true);
+                try {
+                    const resp = await fetch('/api/auth/register', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (resp.status === 201) {
+                        registeredEmail = payload.Email;
+                        if (!codeModal) {
+                            codeModal = new bootstrap.Modal(codeModalEl);
+                        }
+                        codeModal.show();
+                    } else if (resp.status === 400) {
+                        const data = await resp.json();
+                        if (data && data.errors) {
+                            applyModelStateErrors(data.errors);
+                            showAlert('Popraw zaznaczone pola.', 'warning');
+                        } else {
+                            showAlert(data?.message ?? 'Nie udało się zweryfikować danych.', 'danger');
+                        }
+                    } else if (resp.status === 409) {
+                        const data = await resp.json();
+                        showAlert(data.message ?? 'Email lub nazwa użytkownika jest już zajęta.', 'warning');
+                    } else {
+                        showAlert('Wystąpił nieoczekiwany błąd. Spróbuj ponownie.', 'danger');
+                    }
+                } catch {
+                    showAlert('Brak połączenia z serwerem.', 'danger');
+                } finally {
+                    setBusy(false);
+                }
+            });
+
+            const confirmBtn = document.getElementById('confirmBtn');
+            const confirmSpinner = document.getElementById('confirmSpinner');
+            const confirmCodeInput = document.getElementById('confirmCode');
+            const confirmErr = document.getElementById('confirmError');
+            const confirmOk = document.getElementById('confirmOk');
+
+            function setConfirmBusy(busy) {
+                confirmBtn.disabled = busy;
+                confirmSpinner.classList.toggle('d-none', !busy);
+            }
+            function showConfirmError(msg) {
+                confirmErr.textContent = msg;
+                confirmErr.classList.remove('d-none');
+                confirmOk.classList.add('d-none');
+            }
+            function showConfirmOk(msg) {
+                confirmOk.textContent = msg;
+                confirmOk.classList.remove('d-none');
+                confirmErr.classList.add('d-none');
+            }
+
+            confirmBtn.addEventListener('click', async function () {
+                const code = confirmCodeInput.value.trim();
+                if (!/^\d{8}$/.test(code)) {
+                    showConfirmError('Kod musi mieć 8 cyfr.');
+                    return;
+                }
+                setConfirmBusy(true);
+                try {
+                    const resp = await fetch('/api/auth/confirm-email', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: registeredEmail, code })
+                    });
+                    const data = await resp.json().catch(() => ({}));
+                    if (resp.ok) {
+                        showConfirmOk('Adres e-mail został potwierdzony. Możesz się zalogować.');
+                        setTimeout(() => { bootstrap.Modal.getInstance(codeModalEl)?.hide(); }, 900);
+                    } else {
+                        showConfirmError(data?.message ?? 'Nie udało się potwierdzić kodu.');
+                    }
+                } catch {
+                    showConfirmError('Brak połączenia z serwerem.');
+                } finally {
+                    setConfirmBusy(false);
+                }
+            });
+
+            confirmCodeInput.addEventListener('keyup', (e) => {
+                if (e.key === 'Enter') confirmBtn.click();
+            });
+            
+            const resendBtn = document.getElementById('resendBtn');
+            const resendSpinner = document.getElementById('resendSpinner');
+            const resendLabel = document.getElementById('resendLabel');
+            let resendTimerId = null;
+
+            function setResendBusy(b) {
+                resendBtn.disabled = b;
+                resendSpinner.classList.toggle('d-none', !b);
+            }
+
+            function startResendCooldown(seconds) {
+                if (resendTimerId) clearInterval(resendTimerId);
+                let left = Math.max(1, seconds | 0);
+                resendBtn.disabled = true;
+                const base = 'Wyślij ponownie kod';
+                resendLabel.textContent = `${base} (${left}s)`;
+                resendTimerId = setInterval(() => {
+                    left--;
+                    if (left <= 0) {
+                        clearInterval(resendTimerId);
+                        resendLabel.textContent = base;
+                        resendBtn.disabled = false;
+                        return;
+                    }
+                    resendLabel.textContent = `${base} (${left}s)`;
+                }, 1000);
+            }
+
+            resendBtn.addEventListener('click', async () => {
+                if (!registeredEmail) {
+                    showConfirmError('Brak adresu e-mail.');
+                    return;
+                }
+                showConfirmOk('');
+                showConfirmError(''); 
+                confirmErr.classList.add('d-none');
+                confirmOk.classList.add('d-none');
+
+                setResendBusy(true);
+                try {
+                    const resp = await fetch('/api/auth/resend-confirmation', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: registeredEmail })
+                    });
+                    const data = await resp.json().catch(() => ({}));
+
+                    if (resp.status === 200) {
+                        showConfirmOk(data?.message ?? 'Nowy kod został wysłany.');
+                        startResendCooldown(60);
+                    } else if (resp.status === 429) {
+                        const wait = data?.retryInSeconds ?? 60;
+                        showConfirmError(data?.message ?? 'Za często prosisz o kod.');
+                        startResendCooldown(wait);
+                    } else if (resp.status === 404) {
+                        showConfirmError(data?.message ?? 'Użytkownik nie istnieje.');
+                    } else {
+                        showConfirmError(data?.message ?? 'Nie udało się wysłać nowego kodu.');
+                    }
+                } catch {
+                    showConfirmError('Brak połączenia z serwerem.');
+                } finally {
+                    setResendBusy(false);
+                }
+            });
+        })();
+    </script>
+}
