@@ -1,87 +1,140 @@
-﻿@{
+﻿@model EngineeringThesis.Contracts.Auth.LoginRequest
+@{
     ViewData["Title"] = "Logowanie";
 }
 
-<section style="max-width:420px;margin:32px auto;">
-  <h2>Logowanie</h2>
-  <form id="loginForm">
-    <label for="emailInput">Email lub nazwa użytkownika</label>
-    <input id="emailInput" name="email" type="text" required
-           style="width:100%;padding:8px;margin:4px 0 12px;" />
+<h2 class="mb-4">Logowanie</h2>
 
-    <label for="passwordInput">Hasło</label>
-    <input id="passwordInput" name="password" type="password" required
-           style="width:100%;padding:8px;margin:4px 0 12px;" />
+<div id="alertBox" class="alert d-none" role="alert"></div>
 
-    <label style="display:flex;align-items:center;gap:8px;margin:8px 0 16px;">
-      <input id="rememberMe" type="checkbox" />
-      <span>Pamiętaj mnie</span>
-    </label>
+<form id="loginForm" novalidate>
+    <div asp-validation-summary="ModelOnly" class="text-danger mb-2"></div>
 
-    <div id="twoFactorBlock" style="display:none;margin:12px 0;">
-      <label for="totpInput">Kod TOTP (6 cyfr)</label>
-            <input id="totpInput" name="TwoFactorCode" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code"
-             style="width:100%;padding:8px;margin:4px 0 8px;" />
+    <div class="mb-3">
+        <label asp-for="Identifier" class="form-label">E-mail lub nazwa użytkownika</label>
+        <input asp-for="Identifier" class="form-control" autocomplete="username" />
+        <span asp-validation-for="Identifier" class="text-danger"></span>
     </div>
 
-    <button id="loginBtn" type="submit" style="margin-top:8px;">Zaloguj</button>
-  </form>
+    <div class="mb-3">
+        <label asp-for="Password" class="form-label">Hasło</label>
+        <input asp-for="Password" class="form-control" autocomplete="current-password" />
+        <span asp-validation-for="Password" class="text-danger"></span>
+    </div>
 
-  <p id="loginMsg" style="color:#c00;margin-top:12px;"></p>
-</section>
+    <div id="twoFactorBlock" style="display:none;">
+        <div class="mb-3">
+            <label asp-for="TwoFactorCode" class="form-label">Kod TOTP (6 cyfr)</label>
+            <input asp-for="TwoFactorCode"
+                   id="TwoFactorCode"
+                   class="form-control"
+                   inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+                   autocomplete="one-time-code" />
+            <span asp-validation-for="TwoFactorCode" class="text-danger"></span>
+        </div>
+    </div>
 
-<script>
-(function () {
-  const form = document.getElementById('loginForm');
-  const msg  = document.getElementById('loginMsg');
-  const twoFactorBlock = document.getElementById('twoFactorBlock');
+    <button type="submit" id="loginBtn" class="btn btn-primary">
+        <span class="spinner-border spinner-border-sm me-2 d-none" id="loginSpinner" aria-hidden="true"></span>
+        Zaloguj
+    </button>
+</form>
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    msg.textContent = '';
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            const form = document.getElementById('loginForm');
+            const btn = document.getElementById('loginBtn');
+            const spinner = document.getElementById('loginSpinner');
+            const alertBox = document.getElementById('alertBox');
+            const twoFactorBlock = document.getElementById('twoFactorBlock');
 
-    const email = document.getElementById('emailInput').value.trim();
-    const password = document.getElementById('passwordInput').value;
-    const rememberMe = document.getElementById('rememberMe').checked;
-    const twoFactorCodeEl = document.getElementById('totpInput');
-    const twoFactorCode = twoFactorBlock.style.display !== 'none' ? (twoFactorCodeEl.value || null) : null;
+            function showAlert(msg, type) {
+                alertBox.className = 'alert alert-' + type;
+                alertBox.textContent = msg;
+                alertBox.classList.remove('d-none');
+            }
+            function clearAlert() {
+                alertBox.className = 'alert d-none';
+                alertBox.textContent = '';
+            }
+            function setBusy(b) {
+                btn.disabled = b;
+                spinner.classList.toggle('d-none', !b);
+            }
+            function clearServerErrors() {
+                const spans = form.querySelectorAll('span.field-validation-error, span.text-danger');
+                spans.forEach(s => { if (!s.classList.contains('text-danger')) return; s.textContent = ''; });
+                const summary = form.querySelector('[data-valmsg-summary="true"]');
+                if (summary) summary.innerHTML = '';
+            }
+            function applyModelStateErrors(errors) {
+                for (const [field, msgs] of Object.entries(errors)) {
+                    const span = form.querySelector(`[data-valmsg-for="${field}"]`);
+                    if (span) {
+                        span.textContent = msgs.join(' ');
+                        span.classList.add('field-validation-error');
+                    }
+                }
+            }
 
-    const payload = {
-      Identifier: email,
-      Password: password,       
-      RememberMe: rememberMe,   
-      TwoFactorCode: twoFactorCode
-    };
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                clearAlert();
+                clearServerErrors();
 
-    try {
-      const r = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload)
-      });
+                // jQuery unobtrusive validation (jak w rejestracji)
+                if (typeof $ !== 'undefined' && $(form).valid && !$(form).valid()) {
+                    return;
+                }
 
-      if (r.ok) {
-        location.href = '/';
-        return;
-      }
+                const payload = {
+                    Identifier: document.getElementById('Identifier').value.trim(),
+                    Password: document.getElementById('Password').value,
+                    TwoFactorCode: twoFactorBlock.style.display !== 'none'
+                        ? (document.getElementById('TwoFactorCode').value || null)
+                        : null
+                };
 
-      const data = await r.json().catch(() => ({}));
-      const m = (data && (data.message || data.error || JSON.stringify(data))) || 'Błąd logowania.';
+                setBusy(true);
+                try {
+                    const r = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(payload)
+                    });
 
-      if (r.status === 401 && String(m).toLowerCase().includes('wymagany kod 2fa')) {
-        twoFactorBlock.style.display = '';
-        msg.style.color = '#444';
-        msg.textContent = 'Włączone 2FA — podaj 6-cyfrowy kod z aplikacji i spróbuj ponownie.';
-        return;
-      }
+                    if (r.ok) { location.href = '/'; return; }
 
-      msg.style.color = '#c00';
-      msg.textContent = m;
-    } catch (err) {
-      msg.style.color = '#c00';
-      msg.textContent = 'Błąd sieci. Spróbuj ponownie.';
-    }
-  });
-})();
-</script>
+                    const data = await r.json().catch(() => ({}));
+                    const msg = (data && (data.message || data.error || JSON.stringify(data))) || 'Błąd logowania.';
+
+                    if (r.status === 400 && data?.errors) {
+                        applyModelStateErrors(data.errors);
+                        showAlert('Popraw zaznaczone pola.', 'warning');
+                        return;
+                    }
+
+                    if (r.status === 401 && String(msg).toLowerCase().includes('wymagany kod 2fa')) {
+                        twoFactorBlock.style.display = '';
+                        showAlert('Włączone 2FA — podaj 6-cyfrowy kod i spróbuj ponownie.', 'info');
+                        return;
+                    }
+
+                    if (r.status === 429) { // lockout
+                        showAlert(msg, 'warning');
+                        return;
+                    }
+
+                    showAlert(msg, 'danger');
+                } catch {
+                    showAlert('Błąd sieci. Spróbuj ponownie.', 'danger');
+                } finally {
+                    setBusy(false);
+                }
+            });
+        })();
+    </script>
+}

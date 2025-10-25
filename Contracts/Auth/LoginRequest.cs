@@ -12,8 +12,6 @@ namespace EngineeringThesis.Contracts.Auth
         [DataType(DataType.Password)]
         public string Password { get; set; } = string.Empty;
 
-        public bool RememberMe { get; set; } = false;
-
         [MinLength(6), MaxLength(6)]
         public string? TwoFactorCode { get; set; }
     }

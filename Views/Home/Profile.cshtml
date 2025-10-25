@@ -6,9 +6,6 @@
     <h2>Mój profil</h2>
 
     <div id="profileBox" style="padding:12px;border:1px solid #eee;border-radius:8px;margin-top:8px;">
-        <p><strong>Email:</strong> <span id="profEmail">...</span></p>
-        <p><strong>Nazwa użytkownika:</strong> <span id="profUser">...</span></p>
-
         <hr />
 
         <h3>Uwierzytelnianie 2FA (TOTP)</h3>
@@ -64,8 +61,6 @@
         4: 'Ulubiony kolor'
       };
 
-      const profEmail = document.getElementById('profEmail');
-      const profUser  = document.getElementById('profUser');
       const totpToggle = document.getElementById('totpToggle');
       const totpMsg = document.getElementById('totpMsg');
 
@@ -81,35 +76,53 @@
 
       let emailForReset = '';
 
-      (async function loadMe(){
-        try {
-          const r = await fetch('/api/auth/me', { credentials: 'include' });
-          if (!r.ok) throw new Error('Brak autoryzacji');
-          const data = await r.json();
-          profEmail.textContent = data.email || '';
-          profUser.textContent  = data.username || '';
-          emailForReset = data.email || '';
-
-          const r2 = await fetch('/api/auth/twofactor', { credentials: 'include' });
-          if (r2.ok) {
-            const s = await r2.json();
-            totpToggle.checked = !!s.twoFactorEnabled;
-          }
-          
-        } catch {
-          profEmail.textContent = '—';
-          profUser.textContent = '—';
+      function toBool(v) {
+        if (typeof v === 'boolean') return v;
+        if (typeof v === 'number') return v === 1;
+        if (typeof v === 'string') {
+          const x = v.trim().toLowerCase();
+          return x === 'true' || x === '1' || x === 'yes' || x === 'on';
         }
+        return false;
+      }
+
+      function coerceTwoFactor(obj) {
+        if (obj && typeof obj === 'object') {
+          const o = obj.data ?? obj;
+          return toBool(
+            o.twoFactorEnabled ?? o.enabled ?? o.two_factor_enabled ?? o.twoFactor ?? o.value
+          );
+        }
+        return toBool(obj);
+      }
+
+      async function loadTwoFactor() {
+        try {
+          const r2 = await fetch('/api/auth/twofactor', { credentials: 'include' });
+          if (!r2.ok) return;
+          const raw = await r2.text();
+          let payload = raw;
+          try { payload = JSON.parse(raw); } catch {}
+          const isEnabled = coerceTwoFactor(payload);
+          totpToggle.checked = isEnabled;
+        } catch {
+        }
+      }
+
+      (async function init(){
+        await loadTwoFactor();
       })();
 
       document.getElementById('saveTotp').addEventListener('click', async () => {
+        totpMsg.style.color = '#444';
         totpMsg.textContent = 'Zapisywanie...';
+        const enabled = !!totpToggle.checked;
         try {
-            const r = await fetch('/api/auth/twofactor', {
+          const r = await fetch('/api/auth/twofactor', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ enabled: !!totpToggle.checked })
+            body: JSON.stringify({ enabled, twoFactorEnabled: enabled })
           });
           if (r.ok) {
             totpMsg.style.color = '#060';
@@ -138,7 +151,6 @@
           if (!r.ok) throw new Error(data?.message || 'Błąd żądania.');
           const qId = data?.securityQuestion;
           secQEl.textContent = secQMap[qId] ?? 'Pytanie kontrolne';
-
           pwMsg1.textContent = 'Kod wysłany. Wypełnij formularz poniżej.';
           pwForm.style.display = '';
         } catch (e) {

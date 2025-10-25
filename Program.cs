@@ -1,7 +1,8 @@
-using Microsoft.EntityFrameworkCore;
 using EngineeringThesis.Data;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using EngineeringThesis.Services.Security;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,6 +13,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.AddScoped<IPasswordHasher, Pbkdf2PasswordHasher>();
 builder.Services.AddScoped<ITotpService, TotpService>();
+
+builder.Services.AddDataProtection().UseEphemeralDataProtectionProvider();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

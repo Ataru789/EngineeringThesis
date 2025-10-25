@@ -83,7 +83,6 @@ namespace EngineeringThesis.Controllers
                 TwoFactorSecret = totpSecret,
 
                 IsEmailConfirmed = false,
-                FailedLoginCount = 0,
                 
             };
 
@@ -244,16 +243,8 @@ namespace EngineeringThesis.Controllers
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
             var principal = new ClaimsPrincipal(identity);
 
-            var authProps = new AuthenticationProperties
-            {
-                IsPersistent = request.RememberMe
-            };
-            if (request.RememberMe)
-            {
-                
-                authProps.ExpiresUtc = DateTimeOffset.UtcNow.AddDays(30);
-            }
-
+            var authProps = new AuthenticationProperties();
+  
             await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProps);
 
             var resp = new LoginResponse
