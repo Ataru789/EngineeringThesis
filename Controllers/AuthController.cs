@@ -22,7 +22,7 @@ namespace EngineeringThesis.Controllers
         private readonly IPasswordHasher _passwordHasher;
         private readonly ITotpService _totp;
 
-        private const int MaxFailedLogin = 5;
+        private const int MaxFailedLogin = 3;
         private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
 
         public AuthController(AppDbContext db, IPasswordHasher passwordHasher, ITotpService totp)

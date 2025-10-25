@@ -84,7 +84,6 @@
                 clearAlert();
                 clearServerErrors();
 
-                // jQuery unobtrusive validation (jak w rejestracji)
                 if (typeof $ !== 'undefined' && $(form).valid && !$(form).valid()) {
                     return;
                 }
@@ -123,7 +122,7 @@
                         return;
                     }
 
-                    if (r.status === 429) { // lockout
+                    if (r.status === 429) { 
                         showAlert(msg, 'warning');
                         return;
                     }
