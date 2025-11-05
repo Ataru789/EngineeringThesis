@@ -83,7 +83,7 @@ namespace EngineeringThesis.Controllers
                 TwoFactorSecret = totpSecret,
 
                 IsEmailConfirmed = false,
-                
+
             };
 
             _db.Users.Add(user);
@@ -113,7 +113,7 @@ namespace EngineeringThesis.Controllers
             {
                 UserId = user.Id,
                 UserTokenType = UserTokenType.EmailConfirmation,
-                ValueHash = hash,            
+                ValueHash = hash,
                 CreatedAt = now,
                 ExpiresAt = now.AddMinutes(15),
 
@@ -204,7 +204,7 @@ namespace EngineeringThesis.Controllers
                 return Unauthorized(new { message = "Nieprawidłowe dane logowania." });
             }
 
-            
+
             user.FailedLoginCount = 0;
             user.LockoutEnd = null;
 
@@ -244,7 +244,7 @@ namespace EngineeringThesis.Controllers
             var principal = new ClaimsPrincipal(identity);
 
             var authProps = new AuthenticationProperties();
-  
+
             await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProps);
 
             var resp = new LoginResponse
@@ -405,7 +405,7 @@ namespace EngineeringThesis.Controllers
                  "Nowy kod potwierdzenia",
                  $"Twój nowy kod to: <b>{code}</b><br/>Ważny do {now.AddMinutes(15):HH:mm}.",
                  now.AddMinutes(15));
-             
+
             await _db.SaveChangesAsync(ct);
 
             return Ok(new
@@ -460,7 +460,7 @@ namespace EngineeringThesis.Controllers
             {
                 SecurityQuestion = (int)user.SecurityQuestion,
                 ExpiresInSeconds = 15 * 60,
-                Message = "Podaj odpowiedź na pytanie kontrolne i kod resetu."
+                Message = "Podaj odpowiedź na pytanie kontrolne."
             });
         }
 
@@ -587,6 +587,182 @@ namespace EngineeringThesis.Controllers
             await _db.SaveChangesAsync(ct);
 
             return Ok(new { twoFactorEnabled = user.TwoFactorEnabled });
+        }
+
+        [HttpPost("passwordless/request")]
+        [ProducesResponseType(typeof(PasswordlessLoginStartResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+        public async Task<IActionResult> PasswordlessLoginStart([FromBody] PasswordlessLoginStartRequest request, CancellationToken ct)
+        {
+            if (!ModelState.IsValid) return ValidationProblem(ModelState);
+
+            var id = (request.Identifier ?? string.Empty).Trim();
+            User? user = id.Contains('@')
+                ? await _db.Users.SingleOrDefaultAsync(u => u.NormalizedEmail == Normalization.NormalizeEmail(id), ct)
+                : await _db.Users.SingleOrDefaultAsync(u => u.NormalizedUsername == Normalization.NormalizeUsername(id), ct);
+
+            if (user is null)
+            {
+                await Task.Delay(150, ct);
+                return Ok(new PasswordlessLoginStartResponse
+                {
+                    Message = "Jeśli konto istnieje, wysłaliśmy kod jednorazowy.",
+                    ExpiresInSeconds = 15 * 60,
+                    SecurityQuestion = null
+                });
+            }
+
+            if (!user.IsEmailConfirmed)
+            {
+                return Ok(new PasswordlessLoginStartResponse
+                {
+                    Message = "Najpierw potwierdź adres e-mail.",
+                    ExpiresInSeconds = 0,
+                    SecurityQuestion = (int)user.SecurityQuestion
+                });
+            }
+
+            var now = DateTimeOffset.UtcNow;
+
+            var recent = await _db.UserTokens
+                .Where(t => t.UserId == user.Id && t.UserTokenType == UserTokenType.PasswordlessLogin && t.ConsumedAt == null)
+                .OrderByDescending(t => t.CreatedAt)
+                .FirstOrDefaultAsync(ct);
+
+            if (recent is not null)
+            {
+                var seconds = (now - recent.CreatedAt).TotalSeconds;
+                if (seconds < 60)
+                {
+                    return StatusCode(StatusCodes.Status429TooManyRequests, new
+                    {
+                        message = "Za często prosisz o kod. Spróbuj za chwilę.",
+                        retryInSeconds = (int)Math.Ceiling(60 - seconds)
+                    });
+                }
+
+                _db.UserTokens.RemoveRange(_db.UserTokens.Where(t =>
+                    t.UserId == user.Id && t.UserTokenType == UserTokenType.PasswordlessLogin && t.ConsumedAt == null));
+            }
+
+            var (code, hash) = EngineeringThesis.Services.Security.EmailVerification.NewCode();
+            var clientIp = GetClientIp();
+
+            _db.UserTokens.Add(new UserToken
+            {
+                UserId = user.Id,
+                UserTokenType = UserTokenType.PasswordlessLogin,
+                ValueHash = hash,
+                CreatedAt = now,
+                ExpiresAt = now.AddMinutes(15),
+                RequestIp = clientIp?.ToString()
+            });
+
+            SaveDevEmail(
+                user.Email,
+                "Jednorazowy kod logowania",
+                $"Twój kod: <b>{code}</b><br/>Ważny do {now.AddMinutes(15):HH:mm}.",
+                now.AddMinutes(15));
+
+            await _db.SaveChangesAsync(ct);
+
+            return Ok(new PasswordlessLoginStartResponse
+            {
+                Message = "Kod został wysłany. Podaj odpowiedź na pytanie i kod.",
+                ExpiresInSeconds = 15 * 60,
+                SecurityQuestion = (int)user.SecurityQuestion
+            });
+        }
+
+        [HttpPost("passwordless/confirm")]
+        [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> PasswordlessLoginConfirm([FromBody] PasswordlessLoginConfirmRequest request, CancellationToken ct)
+        {
+            if (!ModelState.IsValid) return ValidationProblem(ModelState);
+
+            var id = (request.Identifier ?? string.Empty).Trim();
+            User? user = id.Contains('@')
+                ? await _db.Users.SingleOrDefaultAsync(u => u.NormalizedEmail == Normalization.NormalizeEmail(id), ct)
+                : await _db.Users.SingleOrDefaultAsync(u => u.NormalizedUsername == Normalization.NormalizeUsername(id), ct);
+
+            if (user is null)
+            {
+                await Task.Delay(200, ct);
+                return Unauthorized(new { message = "Nieprawidłowe dane." });
+            }
+
+            if (!user.IsEmailConfirmed)
+                return BadRequest(new { message = "Najpierw potwierdź adres e-mail." });
+
+            var now = DateTimeOffset.UtcNow;
+
+            var codeHash = EngineeringThesis.Services.Security.EmailVerification.Sha256(request.Code);
+            var token = await _db.UserTokens.SingleOrDefaultAsync(t =>
+                t.UserId == user.Id &&
+                t.UserTokenType == UserTokenType.PasswordlessLogin &&
+                t.ConsumedAt == null &&
+                t.ExpiresAt > now &&
+                t.ValueHash == codeHash, ct);
+
+            if (token is null)
+            {
+                await Task.Delay(200, ct);
+                return BadRequest(new { message = "Kod nieprawidłowy lub wygasł." });
+            }
+
+            var okAns = _passwordHasher.Verify(
+                request.SecurityAnswer,
+                user.SecurityAnswerSalt,
+                user.Prf,
+                user.Iterations,
+                user.KdfAlgorithm,
+                user.SecurityAnswerHash);
+
+            if (!okAns)
+            {
+                await Task.Delay(200, ct);
+                return BadRequest(new { message = "Nieprawidłowa odpowiedź na pytanie kontrolne." });
+            }
+
+            if (user.TwoFactorEnabled)
+            {
+                if (string.IsNullOrWhiteSpace(request.TwoFactorCode))
+                    return Unauthorized(new { message = "Wymagany kod 2FA (TOTP). Podaj twoFactorCode (6 cyfr)." });
+
+                if (!_totp.VerifyCode(user.TwoFactorSecret, request.TwoFactorCode, allowedDriftSteps: 0))
+                {
+                    await Task.Delay(200, ct);
+                    return Unauthorized(new { message = "Nieprawidłowy kod 2FA." });
+                }
+            }
+
+            user.FailedLoginCount = 0;
+            user.LockoutEnd = null;
+            token.ConsumedAt = now;
+
+            await _db.SaveChangesAsync(ct);
+
+            var claims = new List<Claim>
+    {
+        new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+        new(ClaimTypes.Name, user.Username),
+        new(ClaimTypes.Email, user.Email)
+    };
+            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            var principal = new ClaimsPrincipal(identity);
+            var authProps = new AuthenticationProperties();
+
+            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProps);
+
+            return Ok(new LoginResponse
+            {
+                UserId = user.Id,
+                Email = user.Email,
+                Username = user.Username,
+                ExpiresAt = authProps.ExpiresUtc
+            });
         }
     }
 }

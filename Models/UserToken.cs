@@ -8,7 +8,8 @@ namespace EngineeringThesis.Models
         EmailConfirmation = 0,
         PasswordReset = 1,
         TwoFactorAuthentication = 2,
-        RememberMe = 3
+        PasswordlessLogin = 3
+
     }
     [Index(nameof(UserId), nameof(UserTokenType), nameof(ExpiresAt))]
     [Index(nameof(ValueHash), IsUnique = true)]

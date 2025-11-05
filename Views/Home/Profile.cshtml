@@ -1,11 +1,13 @@
-﻿@{
+﻿@using System.Security.Claims
+@{
     ViewData["Title"] = "Mój profil";
 }
 
 <section style="max-width:720px;margin:32px auto;">
     <h2>Mój profil</h2>
 
-    <div id="profileBox" style="padding:12px;border:1px solid #eee;border-radius:8px;margin-top:8px;">
+    <div id="profileBox" data-email="@(User?.FindFirst(ClaimTypes.Email)?.Value ?? "")"
+         style="padding:12px;border:1px solid #eee;border-radius:8px;margin-top:8px;">
         <hr />
 
         <h3>Uwierzytelnianie 2FA (TOTP)</h3>
@@ -27,7 +29,6 @@
         </div>
 
         <form id="pwForm" style="display:none;margin-top:12px;">
-            <p><strong>Pytanie kontrolne:</strong> <span id="secQ">...</span></p>
 
             <label for="pwCode">Kod z maila (8 cyfr)</label>
             <input id="pwCode" required inputmode="numeric" pattern="[0-9]{8}" maxlength="8" autocomplete="one-time-code"
@@ -61,20 +62,20 @@
         4: 'Ulubiony kolor'
       };
 
+      const profileBox = document.getElementById('profileBox');
+      let emailForReset = (profileBox?.dataset?.email || '').trim();
+
       const totpToggle = document.getElementById('totpToggle');
       const totpMsg = document.getElementById('totpMsg');
 
       const startBtn = document.getElementById('startPwChange');
       const pwMsg1 = document.getElementById('pwMsg1');
       const pwForm = document.getElementById('pwForm');
-      const secQEl = document.getElementById('secQ');
       const pwCode = document.getElementById('pwCode');
       const secAns = document.getElementById('secAns');
       const pwNew  = document.getElementById('pwNew');
       const pwNew2 = document.getElementById('pwNew2');
       const pwMsg2 = document.getElementById('pwMsg2');
-
-      let emailForReset = '';
 
       function toBool(v) {
         if (typeof v === 'boolean') return v;
@@ -140,6 +141,13 @@
       startBtn.addEventListener('click', async () => {
         pwMsg1.textContent = 'Wysyłam kod na mail...';
         pwMsg1.style.color = '#444';
+
+        if (!emailForReset) {
+          pwMsg1.style.color = '#c00';
+          pwMsg1.textContent = 'Brak e-maila w profilu. Wyloguj i zaloguj się ponownie albo zaktualizuj profil.';
+          return;
+        }
+
         try {
           const r = await fetch('/api/auth/password-reset/request', {
             method: 'POST',
@@ -147,10 +155,9 @@
             credentials: 'include',
             body: JSON.stringify({ Email: emailForReset })
           });
-          const data = await r.json();
+          const data = await r.json().catch(() => ({}));
           if (!r.ok) throw new Error(data?.message || 'Błąd żądania.');
           const qId = data?.securityQuestion;
-          secQEl.textContent = secQMap[qId] ?? 'Pytanie kontrolne';
           pwMsg1.textContent = 'Kod wysłany. Wypełnij formularz poniżej.';
           pwForm.style.display = '';
         } catch (e) {
@@ -183,7 +190,7 @@
             credentials: 'include',
             body: JSON.stringify(payload)
           });
-          const data = await r.json();
+          const data = await r.json().catch(() => ({}));
           if (!r.ok) throw new Error(data?.message || 'Nie udało się zmienić hasła.');
           pwMsg2.style.color = '#060';
           pwMsg2.textContent = 'Hasło zmienione. Zaloguj się ponownie tym hasłem przy kolejnym logowaniu.';

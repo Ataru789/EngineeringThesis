@@ -42,6 +42,11 @@ public class HomeController : Controller
         return View();
     }
 
+    public IActionResult PasswordlessLogin()
+    {
+        return View(); 
+    }
+
     [HttpGet]
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public async Task<IActionResult> Mailbox(string? email, CancellationToken ct)
