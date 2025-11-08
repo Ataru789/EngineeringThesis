@@ -65,8 +65,6 @@ public class AppDbContext : DbContext
                 t.HasCheckConstraint("CK_UserToken_ValueHash_Len", "octet_length(\"ValueHash\") = 32");
             });
 
-            b.HasIndex(ut => new { ut.UserId, ut.UserTokenType, ut.ExpiresAt });
-            b.HasIndex(ut => ut.ValueHash).IsUnique();
         });
 
         modelBuilder.Entity<DevEmailMessage>(b =>
