@@ -8,8 +8,6 @@ namespace EngineeringThesis.Models
 
         [Required, EmailAddress, MaxLength(254)]
         public string ToEmail { get; set; } = string.Empty;
-
-        [Required, MaxLength(254)]
         public string ToNormalizedEmail { get; set; } = string.Empty;
 
         [Required, MaxLength(200)]
