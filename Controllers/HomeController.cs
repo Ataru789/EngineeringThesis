@@ -54,7 +54,7 @@ public class HomeController : Controller
         ViewBag.Email = email ?? string.Empty;
 
         if (string.IsNullOrWhiteSpace(email))
-            return View(new List<EngineeringThesis.Models.DevEmailMessage>());
+            return View(new List<DevEmailMessage>());
 
         var normalized = Normalization.NormalizeEmail(email);
         var exists = await _db.Users.AsNoTracking()
@@ -63,7 +63,7 @@ public class HomeController : Controller
         if (!exists)
         {
             ModelState.AddModelError("Email", "U¿ytkownik z takim e-mailem nie istnieje.");
-            return View(new List<EngineeringThesis.Models.DevEmailMessage>());
+            return View(new List<DevEmailMessage>());
         }
 
         var messages = await _db.DevEmails.AsNoTracking()
