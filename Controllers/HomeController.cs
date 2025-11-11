@@ -1,6 +1,7 @@
 using EngineeringThesis.Data;
 using EngineeringThesis.Services.Common;
 using EngineeringThesis.Services.Security;
+using EngineeringThesis.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Runtime.InteropServices;
