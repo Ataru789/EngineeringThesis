@@ -103,7 +103,7 @@ namespace EngineeringThesis.Controllers
                 .ToListAsync(ct);
             _db.UserTokens.RemoveRange(oldTokens);
 
-            var (code, hash) = EngineeringThesis.Services.Security.EmailVerification.NewCode();
+            var (code, hash) = EmailVerification.NewCode();
 
             var now = DateTimeOffset.UtcNow;
 
@@ -150,7 +150,7 @@ namespace EngineeringThesis.Controllers
         {
             var id = (request.Identifier ?? string.Empty).Trim();
 
-            EngineeringThesis.Models.User? user = null;
+            User? user = null;
             if (id.Contains('@'))
             {
                 var normalizedEmail = Normalization.NormalizeEmail(id);
@@ -311,7 +311,7 @@ namespace EngineeringThesis.Controllers
                     next = new { resend = "POST /api/auth/resend-confirmation" }
                 });
 
-            var hash = EngineeringThesis.Services.Security.EmailVerification.Sha256(request.Code);
+            var hash = EmailVerification.Sha256(request.Code);
             var match = await _db.UserTokens.SingleOrDefaultAsync(t =>
                 t.UserId == user.Id
                 && t.UserTokenType == UserTokenType.EmailConfirmation
@@ -385,7 +385,7 @@ namespace EngineeringThesis.Controllers
                     _db.UserTokens.Where(t => t.UserId == user.Id && t.UserTokenType == UserTokenType.EmailConfirmation && t.ConsumedAt == null));
             }
 
-            var (code, hash) = EngineeringThesis.Services.Security.EmailVerification.NewCode();
+            var (code, hash) = EmailVerification.NewCode();
 
             var clientIp = GetClientIp();
             var ua = HttpContext.Request.Headers.UserAgent.ToString();
@@ -435,7 +435,7 @@ namespace EngineeringThesis.Controllers
             var old = await _db.UserTokens.Where(t => t.UserId == user.Id && t.UserTokenType == UserTokenType.PasswordReset && t.ConsumedAt == null).ToListAsync(ct);
             _db.UserTokens.RemoveRange(old);
 
-            var (code, hash) = EngineeringThesis.Services.Security.EmailVerification.NewCode();
+            var (code, hash) = EmailVerification.NewCode();
             var now = DateTimeOffset.UtcNow;
             var clientIp = GetClientIp();
 
@@ -476,7 +476,7 @@ namespace EngineeringThesis.Controllers
 
             var now = DateTimeOffset.UtcNow;
 
-            var codeHash = EngineeringThesis.Services.Security.EmailVerification.Sha256(request.Code);
+            var codeHash = EmailVerification.Sha256(request.Code);
             var token = await _db.UserTokens.SingleOrDefaultAsync(t =>
             t.UserId == user.Id &&
             t.UserTokenType == UserTokenType.PasswordReset &&
@@ -543,8 +543,8 @@ namespace EngineeringThesis.Controllers
 
         private void SaveDevEmail(string toEmail, string subject, string body, DateTimeOffset expiresAt)
         {
-            var normalized = EngineeringThesis.Services.Common.Normalization.NormalizeEmail(toEmail);
-            _db.DevEmails.Add(new EngineeringThesis.Models.DevEmailMessage
+            var normalized = Normalization.NormalizeEmail(toEmail);
+            _db.DevEmails.Add(new DevEmailMessage
             {
                 ToEmail = toEmail,
                 ToNormalizedEmail = normalized,
@@ -646,7 +646,7 @@ namespace EngineeringThesis.Controllers
                     t.UserId == user.Id && t.UserTokenType == UserTokenType.PasswordlessLogin && t.ConsumedAt == null));
             }
 
-            var (code, hash) = EngineeringThesis.Services.Security.EmailVerification.NewCode();
+            var (code, hash) = EmailVerification.NewCode();
             var clientIp = GetClientIp();
 
             _db.UserTokens.Add(new UserToken
@@ -699,7 +699,7 @@ namespace EngineeringThesis.Controllers
 
             var now = DateTimeOffset.UtcNow;
 
-            var codeHash = EngineeringThesis.Services.Security.EmailVerification.Sha256(request.Code);
+            var codeHash = EmailVerification.Sha256(request.Code);
             var token = await _db.UserTokens.SingleOrDefaultAsync(t =>
                 t.UserId == user.Id &&
                 t.UserTokenType == UserTokenType.PasswordlessLogin &&
