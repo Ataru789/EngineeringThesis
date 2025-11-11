@@ -7,5 +7,7 @@
         public string Username { get; set; } = string.Empty;
         public DateTimeOffset CreatedAt { get; set; }
         public bool IsEmailConfirmed { get; set; }
+        public int SecurityQuestion { get; set; }
+
     }
 }

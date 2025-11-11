@@ -1,14 +1,7 @@
 ﻿using System.Security.Cryptography;
 
 namespace EngineeringThesis.Services.Security
-{
-    public interface IPasswordHasher
-    {
-        PasswordHashResult ComputeHash(string plainPassword);
-        bool Verify(string plainPassword, byte[] salt, string prf, int iterations, string alg, byte[] expectedHash);
-        bool NeedsRehash(string prf, int iterations);
-    }
-
+{ 
     public sealed class PasswordHashResult
     {
         public byte[] Hash { get; init; } = Array.Empty<byte>();   

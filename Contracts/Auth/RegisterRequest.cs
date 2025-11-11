@@ -15,7 +15,8 @@ namespace EngineeringThesis.Contracts.Auth
         [Required(ErrorMessage = "Hasło jest wymagane")]
         [MinLength(8, ErrorMessage = "Minimalna długość to 8")]
         [MaxLength(100, ErrorMessage = "Maksymalna długość to 100")]
-        [RegularExpression(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$", ErrorMessage = "Hasło musi zawierać co najmniej jedną wielką literę, jedną małą literę, jedną cyfrę oraz jeden znak specjalny oraz conajmniej 8 znaków")]
+        [RegularExpression(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$", 
+            ErrorMessage = "Hasło musi zawierać co najmniej jedną wielką literę, jedną małą literę, jedną cyfrę oraz jeden znak specjalny oraz conajmniej 8 znaków")]
         [DataType(DataType.Password)]
         public string Password { get; set; } = string.Empty;
         [Required(ErrorMessage = "Potwierdzenie hasła jest wymagane")]
@@ -23,12 +24,13 @@ namespace EngineeringThesis.Contracts.Auth
         [DataType(DataType.Password)]
         public string ConfirmPassword { get; set; } = string.Empty;
 
-        [Required]
-        [Range(0, 10)]
+        [Required(ErrorMessage = "Pytanie kontrolne jest wymagane")]
+        [Range(0, 10, ErrorMessage = "Nieprawidłowa wartość pytania kontrolnego")]
         public int SecurityQuestion { get; set; }
 
-        [Required]
-        [MinLength(2), MaxLength(200)]
+        [Required(ErrorMessage = "Odpowiedź na pytanie kontrolne jest wymagana")]
+        [MinLength(2, ErrorMessage = "Minimalna długość odpowiedzi to 2")]
+        [MaxLength(200, ErrorMessage = "Maksymalna długość odpowiedzi to 200")]
         public string SecurityAnswer { get; set; } = string.Empty;
     }
 }

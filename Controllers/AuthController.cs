@@ -135,6 +135,7 @@ namespace EngineeringThesis.Controllers
                 Username = user.Username,
                 CreatedAt = user.CreatedAt,
                 IsEmailConfirmed = user.IsEmailConfirmed
+                SecurityQuestion = (int)user.SecurityQuestion
             };
 
             return Created(string.Empty, resp);
