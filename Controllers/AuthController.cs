@@ -127,14 +127,14 @@ namespace EngineeringThesis.Controllers
             now.AddMinutes(15));
 
             await _db.SaveChangesAsync(ct);
-
+            
             var resp = new RegisterResponse
             {
                 Id = user.Id,
                 Email = user.Email,
                 Username = user.Username,
                 CreatedAt = user.CreatedAt,
-                IsEmailConfirmed = user.IsEmailConfirmed
+                IsEmailConfirmed = user.IsEmailConfirmed,
                 SecurityQuestion = (int)user.SecurityQuestion
             };
 
