@@ -613,6 +613,14 @@ namespace EngineeringThesis.Controllers
                 });
             }
 
+            if (user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow)
+            {
+                return StatusCode(StatusCodes.Status429TooManyRequests, new
+                {
+                    message = "Konto tymczasowo zablokowane. Spróbuj ponownie później."
+                });
+            }
+
             if (!user.IsEmailConfirmed)
             {
                 return Ok(new PasswordlessLoginStartResponse
@@ -697,6 +705,11 @@ namespace EngineeringThesis.Controllers
             if (!user.IsEmailConfirmed)
                 return BadRequest(new { message = "Najpierw potwierdź adres e-mail." });
 
+            if (user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow)
+            {
+                return StatusCode(StatusCodes.Status429TooManyRequests, new { message = "Konto tymczasowo zablokowane. Spróbuj ponownie później." });
+            }
+
             var now = DateTimeOffset.UtcNow;
 
             var codeHash = EmailVerification.Sha256(request.Code);
@@ -709,6 +722,14 @@ namespace EngineeringThesis.Controllers
 
             if (token is null)
             {
+                user.FailedLoginCount += 1;
+                if (user.FailedLoginCount >= MaxFailedLogin)
+                {
+                    user.LockoutEnd = DateTimeOffset.UtcNow.Add(LockoutDuration);
+                    user.FailedLoginCount = 0;
+                }
+                await _db.SaveChangesAsync(ct);
+
                 await Task.Delay(200, ct);
                 return BadRequest(new { message = "Kod nieprawidłowy lub wygasł." });
             }
@@ -723,6 +744,14 @@ namespace EngineeringThesis.Controllers
 
             if (!okAns)
             {
+                user.FailedLoginCount += 1;
+                if (user.FailedLoginCount >= MaxFailedLogin)
+                {
+                    user.LockoutEnd = DateTimeOffset.UtcNow.Add(LockoutDuration);
+                    user.FailedLoginCount = 0;
+                }
+                await _db.SaveChangesAsync(ct);
+
                 await Task.Delay(200, ct);
                 return BadRequest(new { message = "Nieprawidłowa odpowiedź na pytanie kontrolne." });
             }
@@ -730,10 +759,28 @@ namespace EngineeringThesis.Controllers
             if (user.TwoFactorEnabled)
             {
                 if (string.IsNullOrWhiteSpace(request.TwoFactorCode))
+                {
+                    user.FailedLoginCount += 1;
+                    if (user.FailedLoginCount >= MaxFailedLogin)
+                    {
+                        user.LockoutEnd = DateTimeOffset.UtcNow.Add(LockoutDuration);
+                        user.FailedLoginCount = 0;
+                    }
+                    await _db.SaveChangesAsync(ct);
+
                     return Unauthorized(new { message = "Wymagany kod 2FA (TOTP). Podaj twoFactorCode (6 cyfr)." });
+                }
 
                 if (!_totp.VerifyCode(user.TwoFactorSecret, request.TwoFactorCode, allowedDriftSteps: 0))
                 {
+                    user.FailedLoginCount += 1;
+                    if (user.FailedLoginCount >= MaxFailedLogin)
+                    {
+                        user.LockoutEnd = DateTimeOffset.UtcNow.Add(LockoutDuration);
+                        user.FailedLoginCount = 0;
+                    }
+                    await _db.SaveChangesAsync(ct);
+
                     await Task.Delay(200, ct);
                     return Unauthorized(new { message = "Nieprawidłowy kod 2FA." });
                 }
@@ -746,11 +793,12 @@ namespace EngineeringThesis.Controllers
             await _db.SaveChangesAsync(ct);
 
             var claims = new List<Claim>
-    {
-        new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-        new(ClaimTypes.Name, user.Username),
-        new(ClaimTypes.Email, user.Email)
-    };
+            {
+                new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new(ClaimTypes.Name, user.Username),
+                new(ClaimTypes.Email, user.Email)
+            };
+
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
             var principal = new ClaimsPrincipal(identity);
             var authProps = new AuthenticationProperties();
@@ -765,5 +813,6 @@ namespace EngineeringThesis.Controllers
                 ExpiresAt = authProps.ExpiresUtc
             });
         }
+
     }
 }
