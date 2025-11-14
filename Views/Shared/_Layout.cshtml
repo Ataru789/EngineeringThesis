@@ -1,6 +1,10 @@
 ﻿@using Microsoft.AspNetCore.Http
 @using System.Security.Claims
 
+@{
+    var backgroundPath = Url.Content("~/images/background2.jpg");
+}
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -12,7 +16,7 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/EngineeringThesis.styles.css" asp-append-version="true" />
 </head>
-<body>
+<body style="background-image: url('@backgroundPath'); background-size: cover; background-repeat: no-repeat; background-attachment: fixed; background-position: center center;">
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
             <div class="container-fluid">
