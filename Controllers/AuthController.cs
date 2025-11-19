@@ -552,7 +552,6 @@ namespace EngineeringThesis.Controllers
                 Body = body,
                 CreatedAt = DateTimeOffset.UtcNow,
                 ExpiresAt = expiresAt,
-                IsRead = false
             });
         }
 
