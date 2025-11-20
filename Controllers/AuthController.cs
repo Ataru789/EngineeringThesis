@@ -514,22 +514,6 @@ namespace EngineeringThesis.Controllers
             return Ok(new { message = "Hasło zostało zresetowane. Możesz się zalogować." });
         }
 
-        [Authorize]
-        [HttpGet("totp/current")]
-        public async Task<IActionResult> CurrentTotp(CancellationToken ct)
-        {
-            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
-
-
-            var user = await _db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == userId, ct);
-            if (user is null) return Unauthorized();
-
-
-            var code = _totp.GenerateCode(user.TwoFactorSecret);
-            var seconds = _totp.SecondsUntilNextStep();
-            return Ok(new { code, validForSeconds = seconds });
-        }
 
         private IPAddress? GetClientIp()
         {

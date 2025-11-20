@@ -13,7 +13,7 @@ namespace EngineeringThesis.Services.Common
             var trimmed = email.Trim();
 
             var normalized = trimmed.Normalize(NormalizationForm.FormC).ToUpperInvariant();
-            return normalized;
+            return normalized; 
         }
 
         public static string NormalizeUsername(string? username)
