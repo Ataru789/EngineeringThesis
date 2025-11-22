@@ -17,7 +17,7 @@ builder.Services.AddScoped<ITotpService, TotpService>();
 builder.Services.AddDataProtection().UseEphemeralDataProtectionProvider();
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(); 
 
 builder.Services.AddAuthorization();
 

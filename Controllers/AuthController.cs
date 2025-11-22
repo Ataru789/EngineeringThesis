@@ -513,8 +513,6 @@ namespace EngineeringThesis.Controllers
 
             return Ok(new { message = "Hasło zostało zresetowane. Możesz się zalogować." });
         }
-
-
         private IPAddress? GetClientIp()
         {
             var h = HttpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
