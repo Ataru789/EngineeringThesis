@@ -87,7 +87,6 @@ public class HomeController : Controller
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public async Task<IActionResult> Totp(string? email, CancellationToken ct)
     {
-        ViewBag.Email = email ?? string.Empty;
 
         if (string.IsNullOrWhiteSpace(email))
             return View();
