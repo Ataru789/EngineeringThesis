@@ -47,11 +47,20 @@ public class HomeController : Controller
         return View(); 
     }
 
+    public IActionResult Mailbox()
+    {
+        return View();
+    }
+
+    public IActionResult Totp()
+    {
+        return View();
+    }
+
     [HttpGet]
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public async Task<IActionResult> Mailbox(string? email, CancellationToken ct)
     {
-        ViewBag.Email = email ?? string.Empty;
 
         if (string.IsNullOrWhiteSpace(email))
             return View(new List<DevEmailMessage>());
