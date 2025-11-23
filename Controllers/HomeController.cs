@@ -111,14 +111,14 @@ public class HomeController : Controller
     public async Task<IActionResult> TotpData([FromQuery] string email, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(email))
-            return BadRequest(new { message = "Brak e-maila." });
+            return BadRequest();
 
         var normalized = Normalization.NormalizeEmail(email);
         var user = await _db.Users.AsNoTracking()
             .SingleOrDefaultAsync(u => u.NormalizedEmail == normalized, ct);
 
         if (user is null)
-            return NotFound(new { message = "Nie znaleziono u¿ytkownika." });
+            return NotFound();
 
         var code = _totp.GenerateCode(user.TwoFactorSecret);
         var validFor = _totp.SecondsUntilNextStep();
