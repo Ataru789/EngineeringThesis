@@ -148,7 +148,7 @@
                 if (typeof $ !== 'undefined' && $(form).valid && !$(form).valid()) {
                     return;
                 }
-
+             
                 const payload = {
                     Email: form.querySelector('#Email').value,
                     Username: form.querySelector('#Username').value,
@@ -165,7 +165,7 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
-
+                    
                     if (resp.status === 201) {
                         registeredEmail = payload.Email;
                         if (!codeModal) {
@@ -213,7 +213,7 @@
                 confirmOk.classList.remove('d-none');
                 confirmErr.classList.add('d-none');
             }
-
+            //
             confirmBtn.addEventListener('click', async function () {
                 const code = confirmCodeInput.value.trim();
                 if (!/^\d{8}$/.test(code)) {
@@ -227,6 +227,7 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ email: registeredEmail, code })
                     });
+                    //
                     const data = await resp.json().catch(() => ({}));
                     if (resp.ok) {
                         showConfirmOk('Adres e-mail został potwierdzony. Możesz się zalogować.');

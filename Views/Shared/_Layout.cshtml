@@ -40,12 +40,6 @@
                             <li class="nav-item">
                                 <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Login">Logowanie</a>
                             </li>
-                            <li class="nav-item">
-                                <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Mailbox">Mail</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Totp">Totp</a>
-                            </li>
                         }
                     </ul>
                     <ul class="navbar-nav ms-auto">
@@ -71,7 +65,7 @@
 
     <footer class="border-top footer text-muted">
         <div class="container">
-            &copy; 2025 - EngineeringThesis - <a asp-area="" asp-controller="Home" asp-action="Privacy">Polityka prywatności</a>
+            &copy; 2025 - EngineeringThesis
         </div>
     </footer>
 
@@ -101,3 +95,5 @@
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
+
+

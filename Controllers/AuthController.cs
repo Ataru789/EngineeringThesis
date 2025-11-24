@@ -563,7 +563,7 @@ namespace EngineeringThesis.Controllers
             if (user is null) return Unauthorized();
 
             if (req.Enabled && (user.TwoFactorSecret == null || user.TwoFactorSecret.Length == 0))
-                user.TwoFactorSecret = System.Security.Cryptography.RandomNumberGenerator.GetBytes(20);
+                user.TwoFactorSecret = RandomNumberGenerator.GetBytes(20);
 
             user.TwoFactorEnabled = req.Enabled;
             await _db.SaveChangesAsync(ct);
